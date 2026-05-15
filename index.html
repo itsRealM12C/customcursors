@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Return the Beanbird Cursor</title>
+    <title>Custom Cursors</title>
     <style>
         body { background: #1a1a1a; color: white; text-align: center; font-family: sans-serif; padding-top: 50px; }
         .button { padding: 20px 40px; margin: 10px; font-size: 1.2rem; border-radius: 50px; border: none; cursor: pointer; color: white; font-weight: bold; transition: 0.2s; }
@@ -17,7 +17,7 @@
     <h1>Return the Beanbird Cursor</h1>
     <p>Press the button below and <b>Accept the prompt on your TV screen.</b></p>
     
-    <button id="btn-run" class="button">Return Beanbird Cursor</button>
+    <button id="btn-run" class="button">7.5</button>
     <button id="btn-reset" class="button">Reset to Default</button>
     <br>
     <div class="note">Note: TV will be blackscreen for 10-20 seconds during the process.</div>
@@ -132,7 +132,7 @@
                         pairingType: 'PROMPT',
                         manifest: {
                             manifestVersion: 1,
-                            localizedAppNames: { '': 'Beanbird Cursor' },
+                            localizedAppNames: { '': 'Custom Cursor' },
                             // Minimal set — less suspicious, still enough to listApps + launch
                             permissions: ['LAUNCH', 'READ_INSTALLED_APPS']
                         }
