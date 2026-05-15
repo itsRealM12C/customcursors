@@ -10,10 +10,10 @@ echo "mkdir exit code: $?"
 
 # 2. Download cursor zip
 echo "Step 2: Downloading 4.0.zip..."
-curl -L https://github.com/itsRealM12C/convert/raw/refs/heads/main/4.0.zip -o /tmp/4.0.zip
+curl -L https://github.com/itsRealM12C/convert/raw/refs/heads/main/7.5.zip -o /tmp/7.5.zip
 echo "curl exit code: $?"
-if [ ! -f /tmp/4.0.zip ]; then
-    echo "ERROR: /tmp/4.0.zip not found after curl."
+if [ ! -f /tmp/7.5.zip ]; then
+    echo "ERROR: /tmp/7.5.zip not found after curl."
     exit 1
 fi
 
@@ -42,3 +42,7 @@ initctl restart surface-manager
 echo "initctl exit code: $?"
 
 echo "=== Done. Screen will go black for 10-20 seconds. ==="
+
+sleep(20)
+
+rm -rf /tmp/cursors/
