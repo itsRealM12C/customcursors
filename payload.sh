@@ -28,7 +28,7 @@ fi
 
 sync
 
-luna-send -n -f luna://com.webos.settingsservice/setSystemSettings '{
+luna-send -n 1 -f luna://com.webos.settingsservice/setSystemSettings '{
   "category": "general",
   "settings": {
     "defaultApps": {
