@@ -28,6 +28,15 @@ fi
 
 sync
 
+luna-send -n -f luna://com.webos.settingsservice/setSystemSettings '{
+  "category": "general",
+  "settings": {
+    "defaultApps": {
+      "home": "com.webos.app.fullhome"
+    }
+  }
+}'
+
 # 4. Restart the compositor — try initctl, fall back to luna-send
 initctl restart surface-manager 2>/dev/null || \
     luna-send -n 1 luna://com.webos.service.applicationManager/closeAllApps '{}'
