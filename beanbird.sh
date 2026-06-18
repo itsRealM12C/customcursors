@@ -47,7 +47,7 @@ sync
 echo "Step 5: Restarting surface-manager..."
 initctl restart surface-manager
 systemctl restart surface-manager
-echo "initctl exit code: $?"
+echo "initctl/systemctl exit code: $?"
 
 echo "=== Done. Screen will go black for 10-20 seconds. ==="
 sleep 10
