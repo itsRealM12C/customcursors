@@ -8,7 +8,7 @@ Homebrew Channel
 # Cursors
 
 `starwars` = Star Wars cursors probably LG did a collab<br>
-`wee` = Blue cursor similar to magenta cursor. Only supports medium sized cursor not small, large.<br>
+`bno` = Blue cursor similar to magenta cursor. Only supports medium sized cursor not small, large.<br>
 `default` = Default cursor, depends on the files.<br>
 `beanbird` = Beanbird cursor<br>
 `webos` = Netcast cursor (coming soon)</br>
