@@ -1,5 +1,5 @@
 # customcursors
-Customize cursors. No one created a tool about so i've made it
+Customize cursors. No one created a tool about it so i've made it
 
 # Requirements
 
